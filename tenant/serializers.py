@@ -1,24 +1,17 @@
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from decimal import Decimal
-
+from django.db import transaction
+from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from property.models import Unit
-
 from .models import Tenant, TenantDocument
 from a_users.models import CustomUser
 
-from rest_framework import serializers
-from django.db import transaction
-from .models import Tenant, Unit, CustomUser
-
-from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from .models import Tenant, Unit
-
 User = get_user_model()
+
 
 class TenantListSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)

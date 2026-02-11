@@ -1,7 +1,7 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import FileExtensionValidator, RegexValidator
 from django.db import models
-from django.forms import ValidationError
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from os import path
@@ -57,7 +57,7 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault('role', 'tenant')
         extra_fields.setdefault('is_active', True)
 
-        if created_by and created_by.role not in ['admin', 'property_manager']:
+        if created_by and not created_by.can_create_tenants():
             raise ValueError(
                 _('Only admins and property managers can create tenants.'))
 
@@ -139,6 +139,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         max_length=10,
         choices=UserGender.choices(),
         default=UserGender.OTHER.value,
+        blank=True,
         help_text=_("User's gender")
     )
 
@@ -219,14 +220,11 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def save(self, *args, **kwargs):
         is_new_user = not self.pk
-        creator = kwargs.pop('created_by', None)
-
+        
         if is_new_user:
+            # Handle plain text password if provided during initial save
             if self.password and not self.password.startswith(('pbkdf2_', 'bcrypt', 'argon2')):
                 self.set_password(self.password)
-
-            if creator and creator.can_create_tenants():
-                self.created_by = creator
 
             if self.role in ['admin', 'property_manager']:
                 self.is_staff = True
@@ -241,6 +239,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         if is_new_user:
             UserAccount = apps.get_model('finance', 'UserAccount')
             UserAccount.objects.get_or_create(user=self)
+
 
     def clean(self):
         super().clean()
